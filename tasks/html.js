@@ -27,20 +27,26 @@ module.exports = function (grunt) {
     };
 
     var filters = {
-        customAttributes: /Attribute "[^"]+" not allowed/,
-        selfClosingTags: /Self-closing syntax \("\/>"\) used on a non-void HTML element/,
+        customAttributes: /Attribute ["“][^"”]+["”] not allowed/,
+        selfClosingTags: /Self-closing syntax \(["“]\/>["”]\) used on a non-void HTML element/,
         documentEncoding: /The character encoding of the document was not declared/,
-        requiredChildren: /Element "[^"]+" is missing a required instance of child element "[^"]+"/,
+        requiredChildren: /Element ["“][^"”]+["”] is missing a required instance of child element ["“][^"”]+["”]/,
         startTagBeforeDocType: /Start tag seen without seeing a doctype first/,
-        strayEndTag: /Stray end tag "[^"]+"/,
+        strayEndTag: /Stray end tag ["“][^"”]+["”]/,
         forLabelControl: /The "for" attribute of the "label" element must refer to a form control/,
         imgAlt: /An "img" element must have an "alt" attribute/,
-        invalidValue: /Bad value "[^"]+" for attribute "[^"]+" on element "[^"]+"/,
-        unclosedElement: /Unclosed element "[^"]+"/,
-        invalidChildElements: /Element "[^"]+" not allowed as child of element "[^"]+" in this context/,
-        openElements: /End tag "[^"]+" seen, but there were open elements/
+        invalidValue: /Bad value ["“][^"”]+["”] for attribute ["“][^"”]+["”] on element ["“][^"”]+["”]/,
+        unclosedElement: /Unclosed element ["“][^"”]+["”]/,
+        invalidChildElements: /Element ["“][^"”]+["”] not allowed as child of element ["“][^"”]+["”] in this context/,
+        openElements: /End tag ["“][^"”]+["”] seen, but there were open elements/
     };
 
+    /**
+     * Quick function to mixin source into target
+     * @param target The target object
+     * @param source The source object
+     * @returns {*}
+     */
     function extend (target, source) {
         target = target || {};
         for (var prop in source) {
@@ -53,14 +59,43 @@ module.exports = function (grunt) {
         return target;
     }
 
+    /**
+     * Simple function to just return true
+     * @returns {boolean}
+     */
     function returnTrueFn() {
         return true;
     }
 
-    function addResults(filter, validationFilter, sourceResults, destResults) {
-        for (var i = 0; i < sourceResults.length; i++) {
-            if (sourceResults[i].match(filter) && validationFilter(sourceResults[i])) {
-                destResults.push(sourceResults[i]);
+    /**
+     * Formats the result into a user readable format
+     * @param result The actual result
+     * @returns {string}
+     */
+    function formatResult(result) {
+        return "\t" + ((result.firstLine || result.lastLine) + "." + result.firstColumn + "-" + result.lastLine + "." + result.lastColumn) + ": " + result.type + ": " + result.message;
+    }
+
+    /**
+     * Filters the current file result against the lint options/validation filters
+     * @param fileResult The validation result from the validator
+     * @param fileUrl The source url
+     * @param lintOptions The lint options to filter against
+     * @param validationFilters The functions which indicate whether or not a lint validation error is truly an error
+     * @param results The results array to add the result to if the validation fails
+     */
+    function filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, results) {
+        var filter;
+        var validationFilter;
+        for (var lintOption in lintOptions) {
+            filter = filters[lintOption];
+            validationFilter = validationFilters[lintOption] || returnTrueFn;
+            if (lintOptions.hasOwnProperty(lintOption) &&
+                lintOptions[lintOption] &&
+                filter &&
+                fileResult.message.match(filter) &&
+                validationFilter(fileUrl, fileResult)) {
+                results.push(formatResult(fileResult));
             }
         }
     }
@@ -80,14 +115,20 @@ module.exports = function (grunt) {
             var lintOptions = extend(extend({}, defaultLintSettings), options);
             var validationFilters = options.validationFilters || {};
             var actualResult = [];
-            var filter;
-            var validationFilter;
 
-            for (var lintOption in lintOptions) {
-                filter = filters[lintOption];
-                validationFilter = validationFilters[lintOption] || returnTrueFn;
-                if (lintOptions.hasOwnProperty(lintOption) && lintOptions[lintOption] && filter) {
-                    addResults(filter, validationFilter, result, actualResult);
+            for (var i = 0; i < result.length; i++) {
+                var fileUrl = result[i].url;
+                var fileResults = result[i].messages;
+                var fileActualResults = [];
+                for (var j = 0; j < fileResults.length; j++) {
+                    var fileResult = fileResults[j];
+                    if (fileResult.type !== "info") {
+                        filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, fileActualResults);
+                    }
+                }
+                if (fileActualResults.length) {
+                    actualResult.push(fileUrl + ":");
+                    actualResult = actualResult.concat(fileActualResults);
                 }
             }
 
