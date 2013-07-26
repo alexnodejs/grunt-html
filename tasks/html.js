@@ -53,9 +53,13 @@ module.exports = function (grunt) {
         return target;
     }
 
-    function addResults(filter, sourceResults, destResults) {
+    function returnTrueFn() {
+        return true;
+    }
+
+    function addResults(filter, validationFilter, sourceResults, destResults) {
         for (var i = 0; i < sourceResults.length; i++) {
-            if (sourceResults[i].match(filter)) {
+            if (sourceResults[i].match(filter) && validationFilter(sourceResults[i])) {
                 destResults.push(sourceResults[i]);
             }
         }
@@ -74,13 +78,16 @@ module.exports = function (grunt) {
             }
 
             var lintOptions = extend(extend({}, defaultLintSettings), options);
+            var validationFilters = options.validationFilters || {};
             var actualResult = [];
             var filter;
+            var validationFilter;
 
             for (var lintOption in lintOptions) {
                 filter = filters[lintOption];
+                validationFilter = validationFilters[lintOption] || returnTrueFn;
                 if (lintOptions.hasOwnProperty(lintOption) && lintOptions[lintOption] && filter) {
-                    addResults(filter, result, actualResult);
+                    addResults(filter, validationFilter, result, actualResult);
                 }
             }
 
