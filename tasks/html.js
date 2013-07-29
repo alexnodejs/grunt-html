@@ -11,34 +11,20 @@ var htmllint = require('../lib/htmllint');
 module.exports = function (grunt) {
     "use strict";
 
-    var defaultLintSettings = {
-        customAttributes: true, // Validate custom attributes
-        selfClosingTags: true, // Validate self closing tags,
-        documentEncoding: true, // Validates for whether or not the document has a character encoding declared,
-        requiredChildren: true, // Validates that elements have the required children,
-        startTagBeforeDocType: true, // Validates that start tags are not before doctypes,
-        strayEndTag: true, // Validates for stray end tags,
-        forLabelControl: true, // Validates that the for attribute on the label points to a control
-        imgAlt: true, // Validates that img tags have an alt attribute,
-        invalidValue: true, // Validates for invalid values for attributes
-        unclosedElement: true, // Validates for unclosed elements
-        invalidChildElements: true, // Validates that elements have valid child elements
-        openElements: true // Validates that there are open elements before a parents close tag
-    };
-
     var filters = {
-        customAttributes: /Attribute ["“][^"”]+["”] not allowed/,
-        selfClosingTags: /Self-closing syntax \(["“]\/>["”]\) used on a non-void HTML element/,
+        customAttributes: /Attribute "[^"]+" not allowed/,
+        selfClosingTags: /Self-closing syntax \("\/>"\) used on a non-void HTML element/,
         documentEncoding: /The character encoding of the document was not declared/,
-        requiredChildren: /Element ["“][^"”]+["”] is missing a required instance of child element ["“][^"”]+["”]/,
+        requiredChildren: /Element "[^"]+" is missing a required instance of child element "[^"]+"/,
         startTagBeforeDocType: /Start tag seen without seeing a doctype first/,
-        strayEndTag: /Stray end tag ["“][^"”]+["”]/,
+        strayEndTag: /Stray end tag "[^"]+"/,
         forLabelControl: /The "for" attribute of the "label" element must refer to a form control/,
         imgAlt: /An "img" element must have an "alt" attribute/,
-        invalidValue: /Bad value ["“][^"”]+["”] for attribute ["“][^"”]+["”] on element ["“][^"”]+["”]/,
-        unclosedElement: /Unclosed element ["“][^"”]+["”]/,
-        invalidChildElements: /Element ["“][^"”]+["”] not allowed as child of element ["“][^"”]+["”] in this context/,
-        openElements: /End tag ["“][^"”]+["”] seen, but there were open elements/
+        invalidValue: /Bad value "[^"]+" for attribute "[^"]+" on element "[^"]+"/,
+        unclosedElement: /Unclosed element "[^"]+"/,
+        invalidChildElements: /Element "[^"]+" not allowed as child of element "[^"]+" in this context/,
+        openElements: /End tag "[^"]+" seen, but there were open elements/,
+        obsoleteAttribute: /The "[^"]+" attribute on the "[^"]+" element is obsolete/
     };
 
     /**
@@ -73,7 +59,11 @@ module.exports = function (grunt) {
      * @returns {string}
      */
     function formatResult(result) {
-        return "\t" + ((result.firstLine || result.lastLine) + "." + result.firstColumn + "-" + result.lastLine + "." + result.lastColumn) + ": " + result.type + ": " + result.message;
+        var message = result.type + (result.subType ? " " + result.subType : "") +  ": " + result.message;
+        if(result.firstLine !== undefined || result.lastLine !== undefined) {
+            message = ((result.firstLine || result.lastLine) + "." + result.firstColumn + "-" + result.lastLine + "." + result.lastColumn) + ": " + message;
+        }
+        return "\t" + message;
     }
 
     /**
@@ -87,13 +77,13 @@ module.exports = function (grunt) {
     function filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, results) {
         var filter;
         var validationFilter;
-        for (var lintOption in lintOptions) {
-            filter = filters[lintOption];
-            validationFilter = validationFilters[lintOption] || returnTrueFn;
-            if (lintOptions.hasOwnProperty(lintOption) &&
-                lintOptions[lintOption] &&
-                filter &&
-                fileResult.message.match(filter) &&
+        var fileMessage = fileResult.message = fileResult.message.replace(/[“”]/g, "\"");
+        for (var filterName in filters) {
+            filter = filters[filterName];
+            validationFilter = validationFilters[filterName] || returnTrueFn;
+            if ((!lintOptions.hasOwnProperty(filterName) ||
+                  lintOptions[filterName] !== false) &&
+                fileMessage.match(filter) &&
                 validationFilter(fileUrl, fileResult)) {
                 results.push(formatResult(fileResult));
             }
@@ -112,7 +102,7 @@ module.exports = function (grunt) {
                 return;
             }
 
-            var lintOptions = extend(extend({}, defaultLintSettings), options);
+            var lintOptions = extend({}, options);
             var validationFilters = options.validationFilters || {};
             var actualResult = [];
 
@@ -122,9 +112,7 @@ module.exports = function (grunt) {
                 var fileActualResults = [];
                 for (var j = 0; j < fileResults.length; j++) {
                     var fileResult = fileResults[j];
-                    if (fileResult.type !== "info") {
-                        filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, fileActualResults);
-                    }
+                    filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, fileActualResults);
                 }
                 if (fileActualResults.length) {
                     actualResult.push(fileUrl + ":");
@@ -133,7 +121,7 @@ module.exports = function (grunt) {
             }
 
             if (!actualResult.length) {
-                grunt.log.writeln(files.length + ' file(s) valid');
+                grunt.log.writeln(files.length + ' valid file(s)');
                 done();
                 return;
             }
