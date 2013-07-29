@@ -12,19 +12,29 @@ module.exports = function (grunt) {
     "use strict";
 
     var filters = {
-        customAttributes: /Attribute "[^"]+" not allowed/,
+        customAttributes: /Attribute "[^"]*" not allowed/,
         selfClosingTags: /Self-closing syntax \("\/>"\) used on a non-void HTML element/,
         documentEncoding: /The character encoding of the document was not declared/,
-        requiredChildren: /Element "[^"]+" is missing a required instance of child element "[^"]+"/,
+        requiredChildren: /Element "[^"]*" is missing a required instance of child element "[^"]*"/,
         startTagBeforeDocType: /Start tag seen without seeing a doctype first/,
-        strayEndTag: /Stray end tag "[^"]+"/,
+        strayEndTag: /Stray end tag "[^"]*"/,
         forLabelControl: /The "for" attribute of the "label" element must refer to a form control/,
-        imgAlt: /An "img" element must have an "alt" attribute/,
-        invalidValue: /Bad value "[^"]+" for attribute "[^"]+" on element "[^"]+"/,
-        unclosedElement: /Unclosed element "[^"]+"/,
-        invalidChildElements: /Element "[^"]+" not allowed as child of element "[^"]+" in this context/,
-        openElements: /End tag "[^"]+" seen, but there were open elements/,
-        obsoleteAttribute: /The "[^"]+" attribute on the "[^"]+" element is obsolete/
+        requiredAttribute: /An "[^"]*" element must have an "[^"]*" attribute/,
+        invalidValue: /Bad value "[^"]*" for attribute "[^"]*" on element "[^"]*"/,
+        unclosedElement: /Unclosed element "[^"]*"/,
+        invalidChildElements: /Element "[^"]*" not allowed as child of element "[^"]*" in this context/,
+        openElements: /End tag "[^"]*" seen, but there were open elements/,
+        obsoleteAttribute: /The "[^"]*" attribute on the "[^"]*" element is obsolete/,
+        obsoleteElement: /The "[^"]*" element is obsolete/,
+        rcdataString: /RCDATA element "[^"]*" contained the string/,
+        endTagInvalidNesting: /End tag "[^"]*" violates nesting rules/
+    };
+
+    // Maps validation types to colors
+    var typeToColor = {
+        info: "blue",
+        error: "red",
+        warning: "yellow"
     };
 
     /**
@@ -46,14 +56,6 @@ module.exports = function (grunt) {
     }
 
     /**
-     * Simple function to just return true
-     * @returns {boolean}
-     */
-    function returnTrueFn() {
-        return true;
-    }
-
-    /**
      * Formats the result into a user readable format
      * @param result The actual result
      * @returns {string}
@@ -61,9 +63,9 @@ module.exports = function (grunt) {
     function formatResult(result) {
         var message = result.type + (result.subType ? " " + result.subType : "") +  ": " + result.message;
         if(result.firstLine !== undefined || result.lastLine !== undefined) {
-            message = ((result.firstLine || result.lastLine) + "." + result.firstColumn + "-" + result.lastLine + "." + result.lastColumn) + ": " + message;
+            message = ((result.firstLine || result.lastLine) + "." + (result.firstColumn || 0) + "-" + result.lastLine + "." + result.lastColumn) + ": " + message;
         }
-        return "\t" + message;
+        return "\t" + message[typeToColor[result.type + (result.subType || "")]];
     }
 
     /**
@@ -76,17 +78,20 @@ module.exports = function (grunt) {
      */
     function filterAndAddResult(fileResult, fileUrl, lintOptions, validationFilters, results) {
         var filter;
-        var validationFilter;
         var fileMessage = fileResult.message = fileResult.message.replace(/[“”]/g, "\"");
+        var doAdd = true;
+        var validationFilter = validationFilters.unknownValidation;
         for (var filterName in filters) {
             filter = filters[filterName];
-            validationFilter = validationFilters[filterName] || returnTrueFn;
-            if ((!lintOptions.hasOwnProperty(filterName) ||
-                  lintOptions[filterName] !== false) &&
-                fileMessage.match(filter) &&
-                validationFilter(fileUrl, fileResult)) {
-                results.push(formatResult(fileResult));
+            if (fileMessage.match(filter)) { // If this message is for this filter
+                doAdd = (!lintOptions.hasOwnProperty(filterName) || lintOptions[filterName] !== false);  // If this error message isn't turned off
+                validationFilter = validationFilters[filterName];
+                break;
             }
+        }
+
+        if (doAdd && (!validationFilter || validationFilter(fileUrl, fileResult))) {
+            results.push(formatResult(fileResult));
         }
     }
 
