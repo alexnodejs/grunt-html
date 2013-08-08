@@ -62,6 +62,10 @@ _rcdataString_ - /RCDATA element "[^"]*" contained the string/
 
 _endTagInvalidNesting_ - /End tag "[^"]*" violates nesting rules/
 
+_sawExpecting_ - /Saw "[^"]*" when expecting an attribute name/,
+
+_selfClosingTagNotSelfClosed_ - /A slash was not immediately followed by "[^"]*"/
+
 #### Usage
 Using lint options requires the use of an alternate syntax in the htmllint config.
 

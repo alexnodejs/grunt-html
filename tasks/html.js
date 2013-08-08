@@ -27,7 +27,9 @@ module.exports = function (grunt) {
         obsoleteAttribute: /The "[^"]*" attribute on the "[^"]*" element is obsolete/,
         obsoleteElement: /The "[^"]*" element is obsolete/,
         rcdataString: /RCDATA element "[^"]*" contained the string/,
-        endTagInvalidNesting: /End tag "[^"]*" violates nesting rules/
+        endTagInvalidNesting: /End tag "[^"]*" violates nesting rules/,
+        sawExpecting: /Saw "[^"]*" when expecting an attribute name/,
+        selfClosingTagNotSelfClosed: /A slash was not immediately followed by "[^"]*"/
     };
 
     // Maps validation types to colors
